@@ -219,6 +219,81 @@ fn ComposedManyFn(
     };
 }
 
+// ComposableFn :: [a -> b, b -> c, c-> d ... e -> f] -> (a -> f)
+
+const IOType = struct {
+    inputType: type,
+    outputType: type,
+};
+
+pub fn extraIO(comptime fun: type) IOType {
+    const info = @typeInfo(fun);
+    switch (info) {
+        .Fn => |f| {
+            const len = f.params.len;
+            if (len != 1) {
+                @compileError("The map function must has only one parameter!");
+            }
+            const R = f.return_type.?;
+            if (R == noreturn) {
+                @compileError("The return type of map function must not be noreturn!");
+            }
+            return .{
+                .inputType = f.params[0].type.?,
+                .outputType = R,
+            };
+        },
+        else => @compileError("Not a fun!"),
+    }
+}
+
+pub fn MCF(comptime fs: []const type) type {
+    // const fs = std.meta.Child()
+    switch (fs.len) {
+        0 => @compileError("Invalid input"),
+        1 => return fs[0],
+        else => for (0..fs.len - 1) |i| {
+            const cio = extraIO(fs[i]);
+            const nio = extraIO(fs[i + 1]);
+            if (cio.outputType != nio.inputType) {
+                @compileError(std.fmt.comptimePrint("Function not match!, idx {d} output: {any}, idx {d} input: {any} ", .{ i, cio.outputType, i + 1, nio.inputType }));
+            }
+            if (i == fs.len - 2) {
+                const rcio = extraIO(fs[0]);
+                const rnio = extraIO(fs[fs.len - 1]);
+                return fn (rcio.inputType) rnio.outputType;
+            }
+        },
+    }
+}
+
+pub fn add_i32(i: i32) i32 {
+    return (i + 1);
+}
+pub fn add_i64(i: i64) i64 {
+    return (i + 1);
+}
+
+// HList :: [Int -> Int, Int -> Bool]
+// f1 :> f2 :> Nil
+
+const Some = struct { some: *anyopaque };
+
+test "MCF" {
+    const g1 = [_]type{ fn (i32) i64, fn (i64) bool, fn (bool) f32 };
+    const k1 = comptime MCF(g1[0..]);
+    std.debug.print("\n{any}\n", .{k1});
+
+    const g2 = [_]*const anyopaque{ &add_i32, &add_i64 };
+    std.debug.print("\n{any}\n", .{g2});
+}
+
+// ComposableFn :: [f1: a -> b, f2: b -> c, f3: c-> d ... fn: e -> f] -> (a -> f)
+
+// pub fn MCF1(comptime fs: []const *type) void {
+//     _ = fs;
+// }
+
 /// Define a lambda type for composable function for function composition
 pub fn ComposableFn(comptime cfg: anytype, comptime N: comptime_int, TS: [N]type) type {
     // The CompsableFn must has a function.
@@ -670,3 +745,19 @@ pub fn deinitOrUnref(a: anytype) void {
         else => {},
     }
 }
+
+// pub fn MCF1(comptime fs: []const type) type {
+//     var res = fs[0];
+//     for (0..fs.len) |_| {
+//         res = fs[1];
+//         @compileError("aaaa");
+//     }
+
+//     return res;
+// }
+
+// test "MCF1" {
+//     const g1 = [_]type{ fn (i32) i32, fn (i64) bool };
+//     const k1 = comptime MCF1(g1[0..]);
+//     std.debug.print("\n\n{any}\n\n", .{k1});
+// }
