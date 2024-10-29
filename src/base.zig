@@ -278,6 +278,14 @@ pub fn mcomposefn(fa: anytype, fb: anytype) (MCF(&.{ @TypeOf(fa), @TypeOf(fb) })
     return Tmp.fun;
 }
 
+test "MCF" {
+    const v1 = mcomposefn(add_fun1, add_fun2);
+    const v2 = mcomposefn(v1, v1);
+    const v3 = mcomposefn(v2, mcomposefn(v1, v2));
+    const v4 = mcomposefn(v1, v3);
+    std.debug.print("\n{any}\n", .{v4(0)});
+}
+
 pub fn extraStructAllTypes(comptime args: anytype) []const type {
     const ArgsType = @TypeOf(args);
     const args_type_info = @typeInfo(ArgsType);
@@ -295,59 +303,56 @@ pub fn extraStructAllTypes(comptime args: anytype) []const type {
     }
 }
 
-pub fn mcomposefns(args: anytype) (MCF(extraStructAllTypes(args))) {
-    // fields less 100!!
-    comptime var tmpFns: [100]*const fn (*anyopaque) *anyopaque = undefined;
-    const ArgsType = @TypeOf(args);
-    const args_type_info = @typeInfo(ArgsType);
-    switch (args_type_info) {
-        .Struct => {
-            const fields = comptime args_type_info.Struct.fields;
-            for (0..fields.len) |i| {
-                tmpFns[i] = @ptrCast(fields[i].default_value.?);
-            }
-            const cio = extraIO(fields[0].type);
-            const nio = extraIO(fields[fields.len - 1].type);
+// pub fn mcomposefns(args: anytype) (MCF(extraStructAllTypes(args))) {
+//     // fields less 100!!
+//     const ArgsType = @TypeOf(args);
+//     const args_type_info = @typeInfo(ArgsType);
+//     switch (args_type_info) {
+//         .Struct => {
+//             const fields = comptime args_type_info.Struct.fields;
+//             const cio = extraIO(fields[0].type);
+//             const nio = extraIO(fields[fields.len - 1].type);
+//             _ = cio;
+//             _ = nio;
 
-            const k = @call(.auto, tmpFns[1], @call(.auto, tmpFns[0], .{0}));
-            _ = k;
-            const Tmp = struct {
-                pub fn fun(a: cio.inputType) nio.outputType {
-                    for (0..fields.len - 1) |i| {
-                        _ = a;
-                        _ = i;
-                    }
-                    return undefined;
-                }
-            };
-            return Tmp.fun;
-        },
-        else => @compileError("input error, need struct"),
-    }
-}
-
-test "MCF" {
-    const v1 = mcomposefn(add_fun1, add_fun2);
-    const v2 = mcomposefn(v1, v1);
-    const v3 = mcomposefn(v2, mcomposefn(v1, v2));
-    const v4 = mcomposefn(v1, v3);
-    std.debug.print("\n{any}\n", .{v4(0)});
-    const k = .{ add_fun1, add_fun2, add_fun1 };
-    const k1 = extraStructAllTypes(k);
-    const k2 = MCF(k1);
-    const k3 = mcomposefns(k);
-    std.debug.print("\n{any}\n", .{@TypeOf(k)});
-    std.debug.print("\n{any}\n", .{@TypeOf(k1)});
-    std.debug.print("\n{any}\n", .{k2});
-    std.debug.print("\n{any}\n", .{@TypeOf(k3)});
-    std.debug.print("\n{any}\n", .{k3(0)});
-}
+//             // const k = @call(.auto, tmpFns[1], @call(.auto, tmpFns[0], .{0}));
+//             // _ = k;
+//             // const Tmp = struct {
+//             //     // pub fn go(i: i32) void {
+//             //     //     const t = fields[i].type;
+//             //     //     _ = t;
+//             //     // }
+//             //     pub fn fun(a: cio.inputType) nio.outputType {
+//             //         for (0..fields.len - 1) |i| {
+//             //             _ = a;
+//             //             _ = i;
+//             //         }
+//             //         return undefined;
+//             //     }
+//             // };
+//             // return Tmp.fun;
+//         },
+//         else => @compileError("input error, need struct"),
+//     }
+// }
 
 pub fn add_fun1(i: i64) i32 {
     return @intCast(i + 1);
 }
 pub fn add_fun2(i: i32) i64 {
     return (i + 100);
+}
+
+test "MCF1" {
+    const k = .{ add_fun1, add_fun2, add_fun1 };
+    // @compileLog(std.fmt.comptimePrint("{any}", .{@typeInfo(@TypeOf(k))}));
+    _ = k;
+    // switch (@typeInfo(@TypeOf(k))) {
+    //     .Struct => |st| {
+    //         std.debug.print("\n{any}\n", .{st});
+    //     },
+    //     else => unreachable,
+    // }
 }
 
 /// Define a lambda type for composable function for function composition
