@@ -279,21 +279,19 @@ pub fn mcomposefn(fa: anytype, fb: anytype) (MCF(&.{ @TypeOf(fa), @TypeOf(fb) })
     return Tmp.fun;
 }
 
-pub fn add_i32(i: i32) i32 {
-    return (i + 1);
+pub fn add_fun1(i: i64) i32 {
+    return @intCast(i + 1);
 }
-pub fn add_i64(i: i32) i32 {
+pub fn add_fun2(i: i32) i64 {
     return (i + 100);
 }
 
 test "MCF" {
-    const g1 = [_]type{ fn (i32) i64, fn (i64) bool, fn (bool) f32 };
-    const k1 = comptime MCF(g1[0..]);
-    std.debug.print("\n{any}\n", .{k1});
-    const v1 = mcomposefn(add_i32, add_i64);
+    const v1 = mcomposefn(add_fun1, add_fun2);
     const v2 = mcomposefn(v1, v1);
-    const v3 = mcomposefn(v2, v2);
-    std.debug.print("\n{any}\n", .{v3(0)});
+    const v3 = mcomposefn(v2, mcomposefn(v1, v2));
+    const v4 = mcomposefn(v1, v3);
+    std.debug.print("\n{any}\n", .{v4(0)});
 }
 
 /// Define a lambda type for composable function for function composition
