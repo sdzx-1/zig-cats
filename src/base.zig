@@ -267,32 +267,34 @@ pub fn MCF(comptime fs: []const type) type {
     }
 }
 
+pub fn mcomposefn(fa: anytype, fb: anytype) (MCF(&.{ @TypeOf(fa), @TypeOf(fb) })) {
+    const cio = extraIO(@TypeOf(fa));
+    const nio = extraIO(@TypeOf(fb));
+
+    const Tmp = struct {
+        pub fn fun(a: cio.inputType) nio.outputType {
+            return fb(fa(a));
+        }
+    };
+    return Tmp.fun;
+}
+
 pub fn add_i32(i: i32) i32 {
     return (i + 1);
 }
-pub fn add_i64(i: i64) i64 {
-    return (i + 1);
+pub fn add_i64(i: i32) i32 {
+    return (i + 100);
 }
-
-// HList :: [Int -> Int, Int -> Bool]
-// f1 :> f2 :> Nil
-
-const Some = struct { some: *anyopaque };
 
 test "MCF" {
     const g1 = [_]type{ fn (i32) i64, fn (i64) bool, fn (bool) f32 };
     const k1 = comptime MCF(g1[0..]);
     std.debug.print("\n{any}\n", .{k1});
-
-    const g2 = [_]*const anyopaque{ &add_i32, &add_i64 };
-    std.debug.print("\n{any}\n", .{g2});
+    const v1 = mcomposefn(add_i32, add_i64);
+    const v2 = mcomposefn(v1, v1);
+    const v3 = mcomposefn(v2, v2);
+    std.debug.print("\n{any}\n", .{v3(0)});
 }
-
-// ComposableFn :: [f1: a -> b, f2: b -> c, f3: c-> d ... fn: e -> f] -> (a -> f)
-
-// pub fn MCF1(comptime fs: []const *type) void {
-//     _ = fs;
-// }
 
 /// Define a lambda type for composable function for function composition
 pub fn ComposableFn(comptime cfg: anytype, comptime N: comptime_int, TS: [N]type) type {
