@@ -398,7 +398,7 @@ pub fn ff1(i: i32) i64 {
 }
 
 pub fn add_fun1(i: i64) i32 {
-    return @intCast(i + 1);
+    return @intCast(i + 10);
 }
 
 pub fn add_fun2(i: i32) i64 {
@@ -408,8 +408,8 @@ pub fn add_fun2(i: i32) i64 {
 test "MyMonad" {
     const MR = MyReader(i32, i64);
     const r1 = MR{ .val = ff1 };
-    std.debug.print("\n{any}\n", .{r1.val(10)});
-    std.debug.print("\n{any}\n", .{r1.fmap(add_fun1).val(10)});
+    std.debug.print("\n{any}\n", .{r1.val(0)});
+    std.debug.print("\n{any}\n", .{r1.fmap(add_fun1).fmap(add_fun2).val(10)});
 
     const m1 = MyMaybe(i32).pure(10);
     const k1 = m1.bind(madd).bind(madd).bind(madd);
