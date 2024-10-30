@@ -331,8 +331,9 @@ pub fn mcomposefns(args: anytype) (MCF(extraStructAllTypes(args))) {
 }
 
 test "MCF1" {
-    const k = .{ add_fun1, add_fun2, add_fun1 };
-    std.debug.print("\n{any}\n", .{mcomposefns(k)(0)});
+    const k = mcomposefns(.{ add_fun1, add_fun2, add_fun1, add_fun2 });
+    std.debug.print("\n{any}\n", .{k(0)});
+    std.debug.print("\n{any}\n", .{mcomposefns(.{ k, k })(0)});
 }
 
 pub fn add_fun1(i: i64) i32 {
