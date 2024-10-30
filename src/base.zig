@@ -308,7 +308,7 @@ pub fn mcomposefns(args: anytype) (MCF(extraStructAllTypes(args))) {
     const args_type_info = @typeInfo(ArgsType);
     switch (args_type_info) {
         .Struct => {
-            const fields = comptime args_type_info.Struct.fields;
+            const fields = args_type_info.Struct.fields;
             const Tmp = struct {
                 const InputType = extraIO(fields[0].type).inputType;
                 pub fn fun(comptime i: usize, input: InputType) extraIO(fields[i].type).outputType {
