@@ -330,17 +330,140 @@ pub fn mcomposefns(args: anytype) (MCF(extraStructAllTypes(args))) {
     }
 }
 
-test "MCF1" {
-    const k = mcomposefns(.{ add_fun1, add_fun2, add_fun1, add_fun2 });
-    std.debug.print("\n{any}\n", .{k(0)});
-    std.debug.print("\n{any}\n", .{mcomposefns(.{ k, k })(0)});
+pub fn MyMaybe(T: type) type {
+    return union(enum) {
+        Nothing: void,
+        Just: T,
+
+        const elem = T;
+
+        pub fn fmap(fa: MyMaybe(T), f: anytype) MyMaybe(extraIO(@TypeOf(f)).outputType) {
+            assert(T == extraIO(@TypeOf(f)).inputType);
+            switch (fa) {
+                .Nothing => return .{ .Nothing = {} },
+                .Just => |a| return .{ .Just = f(a) },
+            }
+        }
+
+        pub fn pure(a: T) MyMaybe(T) {
+            return .{ .Just = a };
+        }
+        pub fn bind(fa: MyMaybe(T), f: anytype) MyMaybe(extraIO(@TypeOf(f)).outputType.elem) {
+            assert(T == extraIO(@TypeOf(f)).inputType);
+            switch (fa) {
+                .Nothing => return .{ .Nothing = {} },
+                .Just => |a| return f(a),
+            }
+        }
+    };
+}
+
+pub fn MyState(T: type) type {
+    return struct {
+        val: T,
+
+        const elem = T;
+
+        pub fn fmap(fa: MyState(T), f: anytype) MyState(extraIO(@TypeOf(f)).outputType) {
+            assert(T == extraIO(@TypeOf(f)).inputType);
+            return .{ .val = f(fa.val) };
+        }
+
+        pub fn pure(a: T) MyState(T) {
+            return .{ .val = a };
+        }
+
+        pub fn bind(fa: MyState(T), f: anytype) MyState(extraIO(@TypeOf(f)).outputType.elem) {
+            assert(T == extraIO(@TypeOf(f)).inputType);
+            return f(fa.val);
+        }
+    };
+}
+
+pub fn MyReader(R: type, T: type) type {
+    return struct {
+        val: fn (R) T,
+
+        const elem = T;
+
+        pub fn fmap(fa: MyReader(R, T), f: anytype) MyReader(R, extraIO(@TypeOf(f)).outputType) {
+            assert(T == extraIO(@TypeOf(f)).inputType);
+            return .{ .val = mcomposefns(.{ fa.val, f }) };
+        }
+    };
+}
+
+pub fn ff1(i: i32) i64 {
+    return (i + 1);
 }
 
 pub fn add_fun1(i: i64) i32 {
     return @intCast(i + 1);
 }
+
 pub fn add_fun2(i: i32) i64 {
     return (i + 100);
+}
+
+test "MyMonad" {
+    const MR = MyReader(i32, i64);
+    const r1 = MR{ .val = ff1 };
+    std.debug.print("\n{any}\n", .{r1.val(10)});
+    std.debug.print("\n{any}\n", .{r1.fmap(add_fun1).val(10)});
+
+    const m1 = MyMaybe(i32).pure(10);
+    const k1 = m1.bind(madd).bind(madd).bind(madd);
+    const k2 = m1.bind(madd).bind(madd).bind(madd).bind(madd);
+    std.debug.print("\n{any}\n", .{k1});
+    std.debug.print("\n{any}\n", .{k2});
+
+    const s1 = MyState(i32).pure(10);
+    std.debug.print("\n{any}\n", .{s1});
+    std.debug.print("\n{any}\n", .{s1.bind(sadd).bind(sadd)});
+    const j1 = MK1{ .Pure = 10 };
+    std.debug.print("\n{any}\n", .{j1});
+    std.debug.print("\n{any}\n", .{j1.pfmap(add_fun2)});
+}
+
+// free
+// data Free f a = Pure a | Free (f (Free f a))
+
+pub fn MyFree(F: fn (type) type, T: anytype) type {
+    return union(enum) {
+        Pure: T,
+        Free: F(*MyFree(F, T)),
+
+        pub fn pfmap(fa: MyFree(F, T), f1: anytype) MyFree(F, extraIO(@TypeOf(f1)).outputType) {
+            assert(T == extraIO(@TypeOf(f1)).inputType);
+            switch (fa) {
+                .Pure => |a| return .{ .Pure = f1(a) },
+                .Free => |_| {
+                    return .{ .Free = undefined };
+                },
+            }
+        }
+    };
+}
+
+const MK1 = MyFree(MyMaybe, i32);
+
+pub fn madd(t: i32) MyMaybe(i32) {
+    if (t > 100) {
+        return .{ .Nothing = {} };
+    } else {
+        return .{ .Just = t + 35 };
+    }
+}
+
+pub fn sadd(t: i32) MyState(i32) {
+    return .{ .val = t + 1 };
+}
+
+test "MCF1" {
+    // var p = .{ add_fun1, add_fun2, undefined, add_fun2 };
+    const k = mcomposefns(.{ add_fun1, add_fun2, add_fun1, add_fun2 });
+    std.debug.print("\n{any}\n", .{k(0)});
+    std.debug.print("\n{any}\n", .{mcomposefns(.{ k, k })(0)});
 }
 
 /// Define a lambda type for composable function for function composition
