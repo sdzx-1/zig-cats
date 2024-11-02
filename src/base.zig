@@ -408,7 +408,9 @@ pub fn add_fun2(i: i32) i64 {
 const S = struct { sv: *const fn (i64) i64 };
 
 test "tmp1" {
-    var s1: S = .{ .sv = mcomposefns(.{ add_fun1, add_fun2 }) };
+    comptime var cc = mcomposefns(.{ add_fun1, add_fun2, add_fun1, add_fun2 });
+    cc = cc;
+    var s1: S = .{ .sv = mcomposefns(.{ add_fun1, add_fun2, cc }) };
     s1.sv = mcomposefns(.{ add_fun1, add_fun2, add_fun1, add_fun2 });
     std.debug.print("\n{any}\n", .{s1.sv(0)});
 }
