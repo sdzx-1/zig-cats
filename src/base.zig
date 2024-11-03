@@ -355,32 +355,16 @@ test "MyFun1" {
 const FunPtrAndType = struct {
     //
     funPtr: *const anyopaque,
-    // fun(A) B
-    funType: type,
 };
 
 pub fn MyFun(it: type, ot: type) type {
     return struct {
         funPtrAndType: []const FunPtrAndType,
-        const inputType = it;
-        const outputType = ot;
-        pub fn init(self: @This(), mftuple: anytype) void {
-            _ = self;
-            _ = mftuple;
-        }
-
-        fn go(self: @This(), comptime i: usize, input: it) extraIO(self.funPtrAndType[i].funType).outputType {
-            const ft = self.funPtrAndType[i].funType;
-            const sf: *const ft = @ptrCast(self.funPtrAndType[i].funPtr);
-            if (i == 0) {
-                return @call(.auto, sf, .{input});
-            } else {
-                return @call(.auto, sf, .{go(self, i - 1, input)});
-            }
-        }
 
         pub fn call(self: @This(), input: it) ot {
-            return go(self, self.funPtrAndType.len - 1, input);
+            _ = self;
+            _ = input;
+            //一些汇编代码，绕过zig类型系统,直接调用 self.funPtrAndType里面的函数
         }
     };
 }
