@@ -303,6 +303,55 @@ pub fn extraStructAllTypes(comptime args: anytype) []const type {
     }
 }
 
+// const FunType = struct {
+//     funType: []type,
+// };
+
+// const FunPtr = struct {
+//     funPtr: []*const anyopaque,
+// };
+
+pub fn MyFun1(comptime fts: []const type, fps: []*const anyopaque) type {
+    return struct {
+        const InputType = extraIO(fts[0]).inputType;
+        fn go(comptime i: usize, input: InputType) extraIO(fts[i]).outputType {
+            const fti = fts[i];
+            const sf: *const fti = @ptrCast(fps[i]);
+            if (i == 0) {
+                return @call(.auto, sf, .{input});
+            } else {
+                return @call(.auto, sf, .{go(i - 1, input)});
+            }
+        }
+
+        pub fn call(input: InputType) extraIO(fts[fts.len - 1]).outputType {
+            return go(fts.len - 1, input);
+        }
+    };
+}
+
+pub fn kf1(i: i32) i64 {
+    return i + 10;
+}
+
+pub fn kf12(i: i32) i64 {
+    return i + 20;
+}
+
+pub fn kf2(i: i64) i32 {
+    const tmp: i32 = @intCast(i);
+    return tmp + 100;
+}
+
+test "MyFun1" {
+    const ts = [_]type{ fn (i32) i64, fn (i64) i32 };
+    const kks = [_]*const anyopaque{ &kf1, &kf2 };
+    var fs = kks[0..];
+    fs = fs;
+    const M1 = MyFun1(ts[0..], @constCast(fs));
+    std.debug.print("\n{any}\n", .{@TypeOf(M1)});
+}
+
 const FunPtrAndType = struct {
     //
     funPtr: *const anyopaque,
@@ -334,15 +383,6 @@ pub fn MyFun(it: type, ot: type) type {
             return go(self, self.funPtrAndType.len - 1, input);
         }
     };
-}
-
-pub fn kf1(i: i32) i64 {
-    return i + 10;
-}
-
-pub fn kf2(i: i64) i32 {
-    const tmp: i32 = @intCast(i);
-    return tmp + 100;
 }
 
 test "MyFun" {
