@@ -347,7 +347,7 @@ pub fn kf2(i: i64) i32 {
 
 test "MyFun" {
     const MK = MyFun(i32, i32);
-    const mk = comptime MK{ .funPtrAndType = &[_]FunPtrAndType{
+    const mk = MK{ .funPtrAndType = &[_]FunPtrAndType{
         .{ .funPtr = &kf1, .funType = fn (i32) i64 },
         .{ .funPtr = &kf2, .funType = fn (i64) i32 },
     } };
