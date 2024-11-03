@@ -303,6 +303,76 @@ pub fn extraStructAllTypes(comptime args: anytype) []const type {
     }
 }
 
+const FunPtrAndType = struct {
+    //
+    funPtr: *const anyopaque,
+    // fun(A) B
+    funType: type,
+};
+
+pub fn MyFun(it: type, ot: type) type {
+    return struct {
+        funPtrAndType: []const FunPtrAndType,
+        const inputType = it;
+        const outputType = ot;
+        pub fn init(self: @This(), mftuple: anytype) void {
+            _ = self;
+            _ = mftuple;
+        }
+
+        fn go(self: @This(), comptime i: usize, input: it) extraIO(self.funPtrAndType[i].funType).outputType {
+            const ft = self.funPtrAndType[i].funType;
+            const sf: *const ft = @ptrCast(self.funPtrAndType[i].funPtr);
+            if (i == 0) {
+                return @call(.auto, sf, .{input});
+            } else {
+                return @call(.auto, sf, .{go(self, i - 1, input)});
+            }
+        }
+
+        pub fn call(self: @This(), input: it) ot {
+            return go(self, self.funPtrAndType.len - 1, input);
+        }
+    };
+}
+
+pub fn kf1(i: i32) i64 {
+    return i + 10;
+}
+
+pub fn kf2(i: i64) i32 {
+    const tmp: i32 = @intCast(i);
+    return tmp + 100;
+}
+
+test "MyFun" {
+    const MK = MyFun(i32, i32);
+    const mk = comptime MK{ .funPtrAndType = &[_]FunPtrAndType{
+        .{ .funPtr = &kf1, .funType = fn (i32) i64 },
+        .{ .funPtr = &kf2, .funType = fn (i64) i32 },
+    } };
+    std.debug.print("\n{any}\n", .{(mk.call(1))});
+    std.debug.print("\n{any}\n", .{@TypeOf(composeMyFun(mk, mk))});
+    // const kkkk = composeMyFun(mk, mk);
+    // std.debug.print("\n{any}\n", .{kkkk.call(1)});
+}
+
+pub fn composeMyFun(myfun1: anytype, myfun2: anytype) MyFun(@TypeOf(myfun1).inputType, @TypeOf(myfun2).outputType) {
+    const fpa1 = myfun1.funPtrAndType;
+    const fpa2 = myfun2.funPtrAndType;
+    var result: [fpa1.len + fpa2.len]FunPtrAndType = undefined;
+    result = result;
+    for (0..result.len) |i| {
+        if (i < fpa1.len) {
+            result[i] = fpa1[i];
+        } else {
+            result[i] = fpa2[i - fpa1.len];
+        }
+    }
+    return .{ .funPtrAndType = result[0..] };
+    // return undefined;
+}
+
 pub fn mcomposefns(args: anytype) (MCF(extraStructAllTypes(args))) {
     const ArgsType = @TypeOf(args);
     const args_type_info = @typeInfo(ArgsType);

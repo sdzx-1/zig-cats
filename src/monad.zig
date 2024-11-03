@@ -235,3 +235,56 @@ fn mkDoContFn(
 
     return do_cont;
 }
+
+// pub fn myConpose(A: type, B: type, C: type, f1: MyFun(A, B), f2: MyFun(B, C)) MyFun(A, C) {
+//     _ = f1;
+//     _ = f2;
+// }
+
+// foo :: (a -> b) -> (b -> c) -> (a -> c)
+//((f11, f22), f33),
+// i *   *     *  o
+//     *
+//         *
+
+// const KK = struct {
+//     arr :
+
+// };
+
+// ccc() :: i v
+// ccc(0)
+// c : a -> a -> a
+// compose :: (a -> b) -> (b -> c) -> (a -> c)
+//
+// 2
+// (a -> b) -> (b -> d) -> (a -> d)
+// (a -> c) -> (c -> d) -> (a -> d)
+//
+// 3
+
+// pub fn f1(i: i32) i64 {
+//     return i + 1;
+// }
+
+// pub fn f2(i: i64) i32 {
+//     const tmp: i32 = @intCast(i);
+//     return tmp + 100;
+// }
+// pub fn foo1(A: type, B: type, C: type, f11: *const fn (A) B, f22: *const fn (B) C) *const fn (A) C {
+//     const k11 = f11.*;
+//     const k22 = f22.*;
+//     const tmp = struct {
+//         pub fn cf(input: A) C {
+//             return k22(k11(input));
+//         }
+//     };
+//     return &tmp.cf;
+// }
+
+// test "foo1" {
+//     const ff = foo1(i32, i64, i32, &f1, &f2);
+//     // const ff1 = foo2(i32, i64, &f1);
+//     const v = ff(0);
+//     std.debug.print("\n{any}\n", .{v});
+// }
