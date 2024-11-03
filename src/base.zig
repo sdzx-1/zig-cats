@@ -330,12 +330,45 @@ pub fn MyFun1(comptime fts: []const type, fps: []*const anyopaque) type {
     };
 }
 
-pub fn kf1(i: i32) i64 {
-    return i + 10;
+const FunPtrAndType = struct {
+    //
+    funPtr: *const anyopaque,
+    // fun(A) B
+    funType: type,
+};
+
+pub fn MyFun(it: type, ot: type) type {
+    return struct {
+        funPtrAndType: []FunPtrAndType,
+        const inputType = it;
+        const outputType = ot;
+        pub fn init(self: @This(), mftuple: anytype) void {
+            _ = self;
+            _ = mftuple;
+        }
+
+        fn go(self: @This(), comptime i: usize, input: it) extraIO(self.funPtrAndType[i].funType).outputType {
+            const ft = self.funPtrAndType[i].funType;
+            const sf: *const ft = @ptrCast(self.funPtrAndType[i].funPtr);
+            if (i == 0) {
+                return @call(.auto, sf, .{input});
+            } else {
+                return @call(.auto, sf, .{go(self, i - 1, input)});
+            }
+        }
+
+        pub fn call(self: @This(), input: it) ot {
+            return go(self, self.funPtrAndType.len - 1, input);
+        }
+    };
 }
 
-pub fn kf12(i: i32) i64 {
-    return i + 20;
+pub fn kf10(i: i32) i64 {
+    return i + 1;
+}
+
+pub fn kf1(i: i32) i64 {
+    return i + 10;
 }
 
 pub fn kf2(i: i64) i32 {
@@ -343,59 +376,77 @@ pub fn kf2(i: i64) i32 {
     return tmp + 100;
 }
 
-test "MyFun1" {
-    const ts = [_]type{ fn (i32) i64, fn (i64) i32 };
-    const kks = [_]*const anyopaque{ &kf1, &kf2 };
-    var fs = kks[0..];
-    fs = fs;
-    const M1 = MyFun1(ts[0..], @constCast(fs));
-    std.debug.print("\n{any}\n", .{@TypeOf(M1)});
-}
-
-const FunPtrAndType = struct {
-    //
-    funPtr: *const anyopaque,
-};
-
-pub fn MyFun(it: type, ot: type) type {
-    return struct {
-        funPtrAndType: []const FunPtrAndType,
-
-        pub fn call(self: @This(), input: it) ot {
-            _ = self;
-            _ = input;
-            //一些汇编代码，绕过zig类型系统,直接调用 self.funPtrAndType里面的函数
-        }
-    };
-}
-
 test "MyFun" {
     const MK = MyFun(i32, i32);
-    const mk = MK{ .funPtrAndType = &[_]FunPtrAndType{
+    const kk = (&[_]FunPtrAndType{
         .{ .funPtr = &kf1, .funType = fn (i32) i64 },
         .{ .funPtr = &kf2, .funType = fn (i64) i32 },
-    } };
+    });
+    const mk = MK{ .funPtrAndType = @constCast(kk) };
+    mk.funPtrAndType[0].funPtr = &kf10;
+    std.debug.print("\n{any}\n", .{@TypeOf(mk)});
     std.debug.print("\n{any}\n", .{(mk.call(1))});
-    std.debug.print("\n{any}\n", .{@TypeOf(composeMyFun(mk, mk))});
+    // std.debug.print("\n{any}\n", .{@TypeOf(composeMyFun(mk, mk))});
     // const kkkk = composeMyFun(mk, mk);
     // std.debug.print("\n{any}\n", .{kkkk.call(1)});
 }
 
-pub fn composeMyFun(myfun1: anytype, myfun2: anytype) MyFun(@TypeOf(myfun1).inputType, @TypeOf(myfun2).outputType) {
-    const fpa1 = myfun1.funPtrAndType;
-    const fpa2 = myfun2.funPtrAndType;
-    var result: [fpa1.len + fpa2.len]FunPtrAndType = undefined;
-    result = result;
-    for (0..result.len) |i| {
-        if (i < fpa1.len) {
-            result[i] = fpa1[i];
-        } else {
-            result[i] = fpa2[i - fpa1.len];
-        }
-    }
-    return .{ .funPtrAndType = result[0..] };
-    // return undefined;
+const TST = struct { tptr: []*i32 };
+
+test "TST" {
+    var va: i32 = 100;
+    const tst = TST{
+        .tptr = @constCast(&[_]*i32{&va}),
+    };
+    std.debug.print("\n{any}\n", .{tst.tptr[0].*});
+    va = 101;
+    std.debug.print("\n{any}\n", .{tst.tptr[0].*});
 }
+
+// pub fn kf1(i: i32) i64 {
+//     return i + 10;
+// }
+
+// pub fn kf12(i: i32) i64 {
+//     return i + 20;
+// }
+
+// pub fn kf2(i: i64) i32 {
+//     const tmp: i32 = @intCast(i);
+//     return tmp + 100;
+// }
+
+// pub fn mycf(A: type, B: type, C: type, a: A, fab: **const fn (A) B, fbc: **const fn (B) C) C {
+//     return fbc.*(fab.*(a));
+// }
+
+// // pub fn mycf1(A: type, B: type, C: type, fab: **const fn (A) B, fbc: **const fn (B) C) **const fn (A) C {
+// //     const Tmp = struct {
+// //         pub fn tmpFun(a: A) C {
+// //             return fbc.*(fab.*(a));
+// //         }
+// //     };
+// //     var k1: *const fn (A) C = comptime Tmp.tmpFun;
+// //     return &k1;
+// // }
+
+// test "mycf" {
+//     var k1: *const fn (i32) i64 = undefined;
+//     k1 = &kf1;
+
+//     var k2: *const fn (i64) i32 = undefined;
+//     k2 = &kf2;
+//     const v = mycf(i32, i64, i32, 0, &k1, &k2);
+//     std.debug.print("\n{any}\n", .{v});
+
+//     k1 = &kf12;
+//     const v1 = mycf(i32, i64, i32, 0, &k1, &k2);
+//     std.debug.print("\n{any}\n", .{v1});
+
+//     // std.debug.print("\n{any}\n", .{@TypeOf(mycf1)});
+//     // const jk = mycf1(i32, i64, i32, &k1, &k2);
+//     // std.debug.print("\n{any}\n", .{@TypeOf(jk)});
+// }
 
 pub fn mcomposefns(args: anytype) (MCF(extraStructAllTypes(args))) {
     const ArgsType = @TypeOf(args);
@@ -1036,4 +1087,58 @@ pub fn deinitOrUnref(a: anytype) void {
 //     const g1 = [_]type{ fn (i32) i32, fn (i64) bool };
 //     const k1 = comptime MCF1(g1[0..]);
 //     std.debug.print("\n\n{any}\n\n", .{k1});
+// }
+
+// test "MyFun1" {
+//     const ts = [_]type{ fn (i32) i64, fn (i64) i32 };
+//     // const kks = [_]*const anyopaque{ &kf1, &kf2 };
+//     // var fs = kks[0..];
+//     // fs = fs;
+//     const M1 = MyFun1(ts[0..], @constCast(fs));
+//     std.debug.print("\n{any}\n", .{@TypeOf(M1)});
+// }
+
+// const FunPtrAndType = struct {
+//     //
+//     funPtr: *const anyopaque,
+// };
+
+// pub fn MyFun(it: type, ot: type) type {
+//     return struct {
+//         funPtrAndType: []const FunPtrAndType,
+
+//         pub fn call(self: @This(), input: it) ot {
+//             _ = self;
+//             _ = input;
+//             //一些汇编代码，绕过zig类型系统,直接调用 self.funPtrAndType里面的函数
+//         }
+//     };
+// }
+
+// test "MyFun" {
+//     const MK = MyFun(i32, i32);
+//     const mk = MK{ .funPtrAndType = &[_]FunPtrAndType{
+//         .{ .funPtr = &kf1, .funType = fn (i32) i64 },
+//         .{ .funPtr = &kf2, .funType = fn (i64) i32 },
+//     } };
+//     std.debug.print("\n{any}\n", .{(mk.call(1))});
+//     std.debug.print("\n{any}\n", .{@TypeOf(composeMyFun(mk, mk))});
+//     // const kkkk = composeMyFun(mk, mk);
+//     // std.debug.print("\n{any}\n", .{kkkk.call(1)});
+// }
+
+// pub fn composeMyFun(myfun1: anytype, myfun2: anytype) MyFun(@TypeOf(myfun1).inputType, @TypeOf(myfun2).outputType) {
+//     const fpa1 = myfun1.funPtrAndType;
+//     const fpa2 = myfun2.funPtrAndType;
+//     var result: [fpa1.len + fpa2.len]FunPtrAndType = undefined;
+//     result = result;
+//     for (0..result.len) |i| {
+//         if (i < fpa1.len) {
+//             result[i] = fpa1[i];
+//         } else {
+//             result[i] = fpa2[i - fpa1.len];
+//         }
+//     }
+//     return .{ .funPtrAndType = result[0..] };
+//     // return undefined;
 // }
