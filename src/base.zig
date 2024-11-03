@@ -339,53 +339,58 @@ const FunPtrAndType = struct {
 
 pub fn MyFun(it: type, ot: type) type {
     return struct {
-        funPtrAndType: []FunPtrAndType,
+        funTypes: [2]type = undefined,
+        funPtrs: [2]*const anyopaque = undefined,
+
         const inputType = it;
         const outputType = ot;
-        pub fn init(self: @This(), mftuple: anytype) void {
-            _ = self;
-            _ = mftuple;
+
+        pub fn initTypes(self: *@This(), ts: [2]type) void {
+            self.funTypes = ts;
+        }
+        pub fn initPtrs(self: *@This(), fs: [2]*const anyopaque) void {
+            self.funPtrs = fs;
         }
 
-        fn go(self: @This(), comptime i: usize, input: it) extraIO(self.funPtrAndType[i].funType).outputType {
-            const ft = self.funPtrAndType[i].funType;
-            const sf: *const ft = @ptrCast(self.funPtrAndType[i].funPtr);
-            if (i == 0) {
-                return @call(.auto, sf, .{input});
-            } else {
-                return @call(.auto, sf, .{go(self, i - 1, input)});
-            }
-        }
+        // fn go(self: @This(), comptime i: usize, input: it) extraIO(self.funPtrAndType[i].funType).outputType {
+        //     const ft = self.funPtrAndType[i].funType;
+        //     const sf: *const ft = @ptrCast(self.funPtrAndType[i].funPtr);
+        //     if (i == 0) {
+        //         return @call(.auto, sf, .{input});
+        //     } else {
+        //         return @call(.auto, sf, .{go(self, i - 1, input)});
+        //     }
+        // }
 
-        pub fn call(self: @This(), input: it) ot {
-            return go(self, self.funPtrAndType.len - 1, input);
-        }
+        // pub fn call(self: @This(), input: it) ot {
+        //     return go(self, self.funPtrAndType.len - 1, input);
+        // }
     };
 }
 
-pub fn kf10(i: i32) i64 {
-    return i + 1;
-}
-
-pub fn kf1(i: i32) i64 {
-    return i + 10;
-}
-
-pub fn kf2(i: i64) i32 {
-    const tmp: i32 = @intCast(i);
-    return tmp + 100;
-}
+// var global: [5]i32 = .{ 1, 2, 3, 4, 5 };
 
 test "MyFun" {
-    const MK = MyFun(i32, i32);
-    const kk = (&[_]FunPtrAndType{
-        .{ .funPtr = &kf1, .funType = fn (i32) i64 },
-        .{ .funPtr = &kf2, .funType = fn (i64) i32 },
-    });
-    const mk = MK{ .funPtrAndType = @constCast(kk) };
-    mk.funPtrAndType[0].funPtr = &kf10;
-    std.debug.print("\n{any}\n", .{@TypeOf(mk)});
-    std.debug.print("\n{any}\n", .{(mk.call(1))});
+    const mk = MyFun(i32, i32){};
+    std.debug.print("{any}", .{@TypeOf(mk)});
+    var k1 = [_]type{ fn (i32) i64, fn (i64) i32 };
+    k1 = k1;
+    mk.initTypes(k1);
+    // std.debug.print("{any}", .{@TypeOf(kk)});
+    // const kk = [2]FunPtrAndType{
+    //     .{ .funPtr = &kf1, .funType = fn (i32) i64 },
+    //     .{ .funPtr = &kf2, .funType = fn (i64) i32 },
+    // };
+    // // kk1 = kk1;
+    // // kk = kk;
+    // const mk = MK{ .funPtrAndType = (kk) };
+    // // mk.funPtrAndType[0].funPtr = &kf10;
+    // // mk.funPtrAndType[1].funPtr = &kf2;
+    // std.debug.print("\n{any}\n", .{@TypeOf(kk)});
+    // // std.debug.print("\n{any}\n", .{@TypeOf(kk1)});
+    // std.debug.print("\n{any}\n", .{(mk.call(1))});
+
+    // // std.debug.print("\n{any}\n", .{@TypeOf(mk)});
     // std.debug.print("\n{any}\n", .{@TypeOf(composeMyFun(mk, mk))});
     // const kkkk = composeMyFun(mk, mk);
     // std.debug.print("\n{any}\n", .{kkkk.call(1)});
@@ -1142,3 +1147,58 @@ pub fn deinitOrUnref(a: anytype) void {
 //     return .{ .funPtrAndType = result[0..] };
 //     // return undefined;
 // }
+
+pub fn kf10(i: i32) i64 {
+    return i + 1;
+}
+
+pub fn kf1(i: i32) i64 {
+    return i + 10;
+}
+
+pub fn kf2(i: i64) i32 {
+    const tmp: i32 = @intCast(i);
+    return tmp + 100;
+}
+
+// const slice = try std.fmt.bufPrint(&fmt, "\r\nerr: {s}\r\n", .{exit_msg});
+pub fn genStructField(i: usize, it: type, ot: type, dv: *const anyopaque) std.builtin.Type.StructField {
+    var fmt: [10]u8 = undefined;
+    return std.builtin.Type.StructField{
+        .name = try std.fmt.bufPrintZ(&fmt, "s{d}", .{i}),
+        .type = *const fn (it) ot,
+        .default_value = dv,
+        .is_comptime = false,
+        .alignment = 8,
+    };
+}
+
+// .{ &kf1, &kf2 }
+pub fn FST(allFunPtrs: anytype) type {
+    const info = @typeInfo(@TypeOf(allFunPtrs));
+    switch (info) {
+        .Struct => |st| {
+            const fields = st.fields;
+            var fieldStructsArr: [fields.len]std.builtin.Type.StructField = undefined;
+            inline for (0..fields.len) |idx| {
+                const funType = std.meta.Child(fields[idx].type);
+                const it = extraIO(funType).inputType;
+                const ot = extraIO(funType).outputType;
+                const dv: fields[idx].type = @field(allFunPtrs, fields[idx].name);
+                fieldStructsArr[idx] = genStructField(idx, it, ot, dv);
+            }
+            const Tmp = struct {};
+            var tmpInfo = @typeInfo(Tmp);
+            tmpInfo.Struct.fields = &fieldStructsArr;
+
+            return @Type(tmpInfo);
+        },
+        else => unreachable,
+    }
+}
+
+test "FST" {
+    var fst = FST(.{ &kf1, &kf2 }){};
+    fst.s0 = &kf10;
+    std.debug.print("\n{any}\n", .{@TypeOf(fst)});
+}
