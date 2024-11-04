@@ -1148,20 +1148,6 @@ pub fn deinitOrUnref(a: anytype) void {
 //     // return undefined;
 // }
 
-pub fn kf10(i: i32) i64 {
-    return i + 1;
-}
-
-pub fn kf1(i: i32) i64 {
-    return i + 10;
-}
-
-pub fn kf2(i: i64) i32 {
-    const tmp: i32 = @intCast(i);
-    return tmp + 100;
-}
-
-// const slice = try std.fmt.bufPrint(&fmt, "\r\nerr: {s}\r\n", .{exit_msg});
 pub fn genStructField(i: usize, it: type, ot: type, dv: *const anyopaque) std.builtin.Type.StructField {
     var fmt: [10]u8 = undefined;
     return std.builtin.Type.StructField{
@@ -1184,8 +1170,8 @@ pub fn FST(allFunPtrs: anytype) type {
                 const funType = std.meta.Child(fields[idx].type);
                 const it = extraIO(funType).inputType;
                 const ot = extraIO(funType).outputType;
-                const dv: fields[idx].type = @field(allFunPtrs, fields[idx].name);
-                fieldStructsArr[idx] = genStructField(idx, it, ot, dv);
+                const dv = @field(allFunPtrs, fields[idx].name);
+                fieldStructsArr[idx] = genStructField(idx, it, ot, @ptrCast(&dv));
             }
             const Tmp = struct {};
             var tmpInfo = @typeInfo(Tmp);
@@ -1197,8 +1183,117 @@ pub fn FST(allFunPtrs: anytype) type {
     }
 }
 
+// const StructField = std.builtin.Type.StructField;
+// pub fn gooLoop(args: anytype, fields: []const StructField, i: usize, input: extraIO(std.meta.Child(fields[0].type)).inputType) extraIO(std.meta.Child(fields[i].type)).outputType {
+//     if (i == 0) {
+//         .call(.auto, @field(args, fields[0].name), .{input});
+//     } else {
+//         .call(.auto, @field(args, fields[i].name), .{gooLoop(args, fields, i - 1, input)});
+//     }
+// }
+
+// pub fn runFST(fst: anytype, input: i32) i32 {
+//     switch (@typeInfo(@TypeOf(fst))) {
+//         .Struct => |st| {
+//             const fields = st.fields;
+//             comptime gooLoop(fst, fields, fields.len - 1, input);
+//         },
+//         else => unreachable,
+//     }
+// }
+
+pub fn printStructFields(a: type) void {
+    switch (@typeInfo(a)) {
+        .Struct => |st| {
+            const fields = st.fields;
+            inline for (0..fields.len) |i| {
+                std.debug.print("\nname: {s}, type: {any} , alignement: {any}, default_val: {any}, is_comptime: {any}\n", .{ fields[i].name, fields[i].type, fields[i].alignment, fields[i].default_value, fields[i].is_comptime });
+            }
+        },
+        else => unreachable,
+    }
+}
+
 test "FST" {
     var fst = FST(.{ &kf1, &kf2 }){};
-    fst.s0 = &kf10;
+    printStructFields(@TypeOf(fst));
     std.debug.print("\n{any}\n", .{@TypeOf(fst)});
+    std.debug.print("\n{any}\n", .{fst.s0(0)});
+    fst.s0 = &kf10;
+    std.debug.print("\n{any}\n", .{fst.s0(0)});
+    // const rest = runFST(fst, 0);
+    // std.debug.print("\n{any}\n", .{rest});
+}
+
+//  (a -> b) -> (b -> c) -> (a -> c)
+//  *const (a -> b) -> *const (b -> c) -> *const (a -> c)
+// **cosnt (a -> b) -> **const (b -> c) -> **const (a -> c)
+
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const globalAllocator = gpa.allocator();
+
+const Error1 = std.mem.Allocator.Error;
+
+pub fn myTrans(A: type, B: type, f: fn (A) B) fn (*const A) Error1!*const B {
+    const Tmp = struct {
+        pub fn f1(aRef: *const A) Error1!*const B {
+            const a = aRef.*;
+            const b = f(a);
+            const ptr = try globalAllocator.create(B);
+            ptr.* = b;
+            return ptr;
+        }
+    };
+    return Tmp.f1;
+}
+
+pub fn toOpaque(A: type, B: type, f: fn (*const A) Error1!*const B) *const fn (*const anyopaque) Error1!*const anyopaque {
+    const Tmp = struct {
+        pub fn f1(oRef: *const anyopaque) Error1!*const anyopaque {
+            const aRef: *const A = @ptrCast(@alignCast(oRef));
+            const res = try f(aRef);
+            return @ptrCast(res);
+        }
+    };
+    return &Tmp.f1;
+}
+
+pub fn MF(A: type, B: type) type {
+    _ = A;
+    _ = B;
+    return struct {
+        mfarr: []*const anyopaque,
+    };
+}
+
+pub fn kf10(i: i32) i64 {
+    return i + 1;
+}
+
+pub fn kf1(i: i32) i64 {
+    return i + 10;
+}
+
+pub fn kf2(i: i64) i32 {
+    const tmp: i32 = @intCast(i);
+    return tmp + 100;
+}
+
+test "MyTrans" {
+    const nkf1 = myTrans(i32, i64, kf1);
+    const okf1 = toOpaque(i32, i64, nkf1);
+
+    var sot = [_]*const anyopaque{okf1};
+    var mf = MF(i32, i64){ .mfarr = &sot };
+    mf = mf;
+    const nkf10 = myTrans(i32, i64, kf10);
+    const okf10 = toOpaque(i32, i64, nkf10);
+    mf.mfarr[0] = okf10;
+
+    const tp: i32 = 0;
+    const tt: *const fn (*const anyopaque) Error1!*const anyopaque = @ptrCast(mf.mfarr[0]);
+    const ptr = try tt(&tp);
+    std.debug.print("\n{any}\n", .{@TypeOf(okf1)});
+    const rest: *const i64 = @ptrCast(@alignCast(ptr));
+    std.debug.print("\n{any}\n", .{rest.*});
 }
