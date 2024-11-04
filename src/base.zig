@@ -1276,6 +1276,19 @@ pub fn MF(A: type, B: type) type {
     };
 }
 
+test "MyTrans" {
+    const nkf1 = myTrans(i32, i64, kf1);
+    const okf1 = toOpaque(i32, i64, nkf1);
+    const nkf2 = myTrans(i64, i32, kf2);
+    const okf2 = toOpaque(i64, i32, nkf2);
+
+    var sot = [_]*const anyopaque{ okf1, okf2 };
+    var mf = MF(i32, i64){ .mfarr = &sot };
+    mf = mf;
+
+    std.debug.print("\n{any}\n", .{mf.call(0)});
+}
+
 pub fn kf10(i: i32) i64 {
     return i + 1;
 }
@@ -1287,26 +1300,4 @@ pub fn kf1(i: i32) i64 {
 pub fn kf2(i: i64) i32 {
     const tmp: i32 = @intCast(i);
     return tmp + 100;
-}
-
-test "MyTrans" {
-    const nkf1 = myTrans(i32, i64, kf1);
-    const okf1 = toOpaque(i32, i64, nkf1);
-    const nkf2 = myTrans(i64, i32, kf2);
-    const okf2 = toOpaque(i64, i32, nkf2);
-
-    var sot = [_]*const anyopaque{ okf1, okf2 };
-    var mf = MF(i32, i64){ .mfarr = &sot };
-    mf = mf;
-    // mf.mfarr[0] = okf10;
-
-    const tp: i32 = 0;
-    const tt: *const fn (*const anyopaque) Error1!*const anyopaque = @ptrCast(mf.mfarr[0]);
-    const ptr = try tt(&tp);
-    std.debug.print("\n{any}\n", .{@TypeOf(okf1)});
-    const rest: *const i64 = @ptrCast(@alignCast(ptr));
-    std.debug.print("\n{any}\n", .{rest.*});
-    std.debug.print("\n\n", .{});
-
-    std.debug.print("\n{any}\n", .{mf.call(tp)});
 }
