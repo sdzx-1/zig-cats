@@ -1239,6 +1239,7 @@ pub fn myTrans(A: type, B: type, f: fn (A) B) fn (*const A) Error1!*const B {
         pub fn f1(aRef: *const A) Error1!*const B {
             const a = aRef.*;
             const b = f(a);
+            std.debug.print("alloc \n", .{});
             const ptr = try globalAllocator.create(B);
             ptr.* = b;
             return ptr;
@@ -1259,10 +1260,19 @@ pub fn toOpaque(A: type, B: type, f: fn (*const A) Error1!*const B) *const fn (*
 }
 
 pub fn MF(A: type, B: type) type {
-    _ = A;
-    _ = B;
     return struct {
         mfarr: []*const anyopaque,
+
+        pub fn call(self: @This(), input: A) Error1!B {
+            var result: *const anyopaque = &input;
+            for (0..self.mfarr.len) |i| {
+                const tt: *const fn (*const anyopaque) Error1!*const anyopaque = @ptrCast(self.mfarr[i]);
+                std.debug.print("\n{any}\n", .{result});
+                result = try tt(result);
+            }
+            const ptr: *const B = @ptrCast(@alignCast(result));
+            return ptr.*;
+        }
     };
 }
 
@@ -1282,13 +1292,13 @@ pub fn kf2(i: i64) i32 {
 test "MyTrans" {
     const nkf1 = myTrans(i32, i64, kf1);
     const okf1 = toOpaque(i32, i64, nkf1);
+    const nkf2 = myTrans(i64, i32, kf2);
+    const okf2 = toOpaque(i64, i32, nkf2);
 
-    var sot = [_]*const anyopaque{okf1};
+    var sot = [_]*const anyopaque{ okf1, okf2 };
     var mf = MF(i32, i64){ .mfarr = &sot };
     mf = mf;
-    const nkf10 = myTrans(i32, i64, kf10);
-    const okf10 = toOpaque(i32, i64, nkf10);
-    mf.mfarr[0] = okf10;
+    // mf.mfarr[0] = okf10;
 
     const tp: i32 = 0;
     const tt: *const fn (*const anyopaque) Error1!*const anyopaque = @ptrCast(mf.mfarr[0]);
@@ -1296,4 +1306,7 @@ test "MyTrans" {
     std.debug.print("\n{any}\n", .{@TypeOf(okf1)});
     const rest: *const i64 = @ptrCast(@alignCast(ptr));
     std.debug.print("\n{any}\n", .{rest.*});
+    std.debug.print("\n\n", .{});
+
+    std.debug.print("\n{any}\n", .{mf.call(tp)});
 }
