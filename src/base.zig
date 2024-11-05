@@ -1283,13 +1283,18 @@ test "MyTrans" {
     // const tptr = &memptr;
     const nkf1 = myTrans(i32, i64, kf1);
     const okf1 = toOpaque(i32, i64, nkf1);
+
+    const nkf10 = myTrans(i32, i64, kf10);
+    const okf10 = toOpaque(i32, i64, nkf10);
+
     const nkf2 = myTrans(i64, i32, kf2);
     const okf2 = toOpaque(i64, i32, nkf2);
 
     var sot = [_]*const anyopaque{ okf1, okf2 };
     var mf = MF(i32, i32){ .mfarr = &sot };
-    mf = mf;
 
+    std.debug.print("\n{any}\n", .{mf.call(0)});
+    mf.mfarr[0] = okf10;
     std.debug.print("\n{any}\n", .{mf.call(0)});
 }
 
