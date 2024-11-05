@@ -1262,6 +1262,7 @@ pub fn toOpaque(A: type, B: type, f: fn (*const A) Error1!*const B) *const fn (*
 pub fn MF(A: type, B: type) type {
     return struct {
         mfarr: []*const anyopaque,
+        memptr: [40]u8 = undefined,
 
         pub fn call(self: @This(), input: A) Error1!B {
             var result: *const anyopaque = &input;
@@ -1283,7 +1284,7 @@ test "MyTrans" {
     const okf2 = toOpaque(i64, i32, nkf2);
 
     var sot = [_]*const anyopaque{ okf1, okf2 };
-    var mf = MF(i32, i64){ .mfarr = &sot };
+    var mf = MF(i32, i32){ .mfarr = &sot };
     mf = mf;
 
     std.debug.print("\n{any}\n", .{mf.call(0)});
