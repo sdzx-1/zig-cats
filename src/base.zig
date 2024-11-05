@@ -229,7 +229,7 @@ const IOType = struct {
 pub fn extraIO(comptime fun: type) IOType {
     const info = @typeInfo(fun);
     switch (info) {
-        .Fn => |f| {
+        .@"fn" => |f| {
             const len = f.params.len;
             if (len != 1) {
                 @compileError("The map function must has only one parameter!");
@@ -290,7 +290,7 @@ pub fn extraStructAllTypes(comptime args: anytype) []const type {
     const ArgsType = @TypeOf(args);
     const args_type_info = @typeInfo(ArgsType);
     switch (args_type_info) {
-        .Struct => {
+        .@"struct" => {
             const fields = args_type_info.Struct.fields;
             // fields less 100!!
             var tmp: [100]type = undefined;
@@ -329,129 +329,6 @@ pub fn MyFun1(comptime fts: []const type, fps: []*const anyopaque) type {
         }
     };
 }
-
-const FunPtrAndType = struct {
-    //
-    funPtr: *const anyopaque,
-    // fun(A) B
-    funType: type,
-};
-
-pub fn MyFun(it: type, ot: type) type {
-    return struct {
-        funTypes: [2]type = undefined,
-        funPtrs: [2]*const anyopaque = undefined,
-
-        const inputType = it;
-        const outputType = ot;
-
-        pub fn initTypes(self: *@This(), ts: [2]type) void {
-            self.funTypes = ts;
-        }
-        pub fn initPtrs(self: *@This(), fs: [2]*const anyopaque) void {
-            self.funPtrs = fs;
-        }
-
-        // fn go(self: @This(), comptime i: usize, input: it) extraIO(self.funPtrAndType[i].funType).outputType {
-        //     const ft = self.funPtrAndType[i].funType;
-        //     const sf: *const ft = @ptrCast(self.funPtrAndType[i].funPtr);
-        //     if (i == 0) {
-        //         return @call(.auto, sf, .{input});
-        //     } else {
-        //         return @call(.auto, sf, .{go(self, i - 1, input)});
-        //     }
-        // }
-
-        // pub fn call(self: @This(), input: it) ot {
-        //     return go(self, self.funPtrAndType.len - 1, input);
-        // }
-    };
-}
-
-// var global: [5]i32 = .{ 1, 2, 3, 4, 5 };
-
-test "MyFun" {
-    const mk = MyFun(i32, i32){};
-    std.debug.print("{any}", .{@TypeOf(mk)});
-    var k1 = [_]type{ fn (i32) i64, fn (i64) i32 };
-    k1 = k1;
-    mk.initTypes(k1);
-    // std.debug.print("{any}", .{@TypeOf(kk)});
-    // const kk = [2]FunPtrAndType{
-    //     .{ .funPtr = &kf1, .funType = fn (i32) i64 },
-    //     .{ .funPtr = &kf2, .funType = fn (i64) i32 },
-    // };
-    // // kk1 = kk1;
-    // // kk = kk;
-    // const mk = MK{ .funPtrAndType = (kk) };
-    // // mk.funPtrAndType[0].funPtr = &kf10;
-    // // mk.funPtrAndType[1].funPtr = &kf2;
-    // std.debug.print("\n{any}\n", .{@TypeOf(kk)});
-    // // std.debug.print("\n{any}\n", .{@TypeOf(kk1)});
-    // std.debug.print("\n{any}\n", .{(mk.call(1))});
-
-    // // std.debug.print("\n{any}\n", .{@TypeOf(mk)});
-    // std.debug.print("\n{any}\n", .{@TypeOf(composeMyFun(mk, mk))});
-    // const kkkk = composeMyFun(mk, mk);
-    // std.debug.print("\n{any}\n", .{kkkk.call(1)});
-}
-
-const TST = struct { tptr: []*i32 };
-
-test "TST" {
-    var va: i32 = 100;
-    const tst = TST{
-        .tptr = @constCast(&[_]*i32{&va}),
-    };
-    std.debug.print("\n{any}\n", .{tst.tptr[0].*});
-    va = 101;
-    std.debug.print("\n{any}\n", .{tst.tptr[0].*});
-}
-
-// pub fn kf1(i: i32) i64 {
-//     return i + 10;
-// }
-
-// pub fn kf12(i: i32) i64 {
-//     return i + 20;
-// }
-
-// pub fn kf2(i: i64) i32 {
-//     const tmp: i32 = @intCast(i);
-//     return tmp + 100;
-// }
-
-// pub fn mycf(A: type, B: type, C: type, a: A, fab: **const fn (A) B, fbc: **const fn (B) C) C {
-//     return fbc.*(fab.*(a));
-// }
-
-// // pub fn mycf1(A: type, B: type, C: type, fab: **const fn (A) B, fbc: **const fn (B) C) **const fn (A) C {
-// //     const Tmp = struct {
-// //         pub fn tmpFun(a: A) C {
-// //             return fbc.*(fab.*(a));
-// //         }
-// //     };
-// //     var k1: *const fn (A) C = comptime Tmp.tmpFun;
-// //     return &k1;
-// // }
-
-// test "mycf" {
-//     var k1: *const fn (i32) i64 = undefined;
-//     k1 = &kf1;
-
-//     var k2: *const fn (i64) i32 = undefined;
-//     k2 = &kf2;
-//     const v = mycf(i32, i64, i32, 0, &k1, &k2);
-//     std.debug.print("\n{any}\n", .{v});
-
-//     k1 = &kf12;
-//     const v1 = mycf(i32, i64, i32, 0, &k1, &k2);
-//     std.debug.print("\n{any}\n", .{v1});
-
-//     // std.debug.print("\n{any}\n", .{@TypeOf(mycf1)});
-//     // const jk = mycf1(i32, i64, i32, &k1, &k2);
-//     // std.debug.print("\n{any}\n", .{@TypeOf(jk)});
-// }
 
 pub fn mcomposefns(args: anytype) (MCF(extraStructAllTypes(args))) {
     const ArgsType = @TypeOf(args);
@@ -1214,49 +1091,24 @@ pub fn printStructFields(a: type) void {
     }
 }
 
-test "FST" {
-    var fst = FST(.{ &kf1, &kf2 }){};
-    printStructFields(@TypeOf(fst));
-    std.debug.print("\n{any}\n", .{@TypeOf(fst)});
-    std.debug.print("\n{any}\n", .{fst.s0(0)});
-    fst.s0 = &kf10;
-    std.debug.print("\n{any}\n", .{fst.s0(0)});
-    // const rest = runFST(fst, 0);
-    // std.debug.print("\n{any}\n", .{rest});
-}
-
-//  (a -> b) -> (b -> c) -> (a -> c)
-//  *const (a -> b) -> *const (b -> c) -> *const (a -> c)
-// **cosnt (a -> b) -> **const (b -> c) -> **const (a -> c)
-
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-const globalAllocator = gpa.allocator();
-
-const Error1 = std.mem.Allocator.Error;
-
 var globalOutputArray: [2]u128 = undefined;
 
-pub fn myTrans(A: type, B: type, f: fn (A) B) fn (*const A) Error1!*const B {
+pub fn myTrans(A: type, B: type, f: fn (A) B) fn (*const A) *const B {
     const Tmp = struct {
-        pub fn f1(aRef: *const A) Error1!*const B {
-            const a = aRef.*;
-            const b = f(a);
+        pub fn f1(aRef: *const A) *const B {
             const ptr: *B = @ptrCast(@alignCast(&globalOutputArray));
-            std.debug.print("copy \n", .{});
-            ptr.* = b;
-
+            ptr.* = f(aRef.*);
             return ptr;
         }
     };
     return Tmp.f1;
 }
 
-pub fn toOpaque(A: type, B: type, f: fn (*const A) Error1!*const B) *const fn (*const anyopaque) Error1!*const anyopaque {
+pub fn toOpaque(A: type, B: type, f: fn (*const A) *const B) *const fn (*const anyopaque) *const anyopaque {
     const Tmp = struct {
-        pub fn f1(oRef: *const anyopaque) Error1!*const anyopaque {
+        pub fn f1(oRef: *const anyopaque) *const anyopaque {
             const aRef: *const A = @ptrCast(@alignCast(oRef));
-            const res = try f(aRef);
-            return @ptrCast(res);
+            return @ptrCast(f(aRef));
         }
     };
     return &Tmp.f1;
@@ -1266,12 +1118,11 @@ pub fn MF(A: type, B: type) type {
     return struct {
         mfarr: []*const anyopaque,
 
-        pub fn call(self: @This(), input: A) Error1!B {
+        pub fn call(self: @This(), input: A) B {
             var result: *const anyopaque = &input;
             for (0..self.mfarr.len) |i| {
-                const tt: *const fn (*const anyopaque) Error1!*const anyopaque = @ptrCast(self.mfarr[i]);
-                std.debug.print("\n{any}\n", .{result});
-                result = try tt(result);
+                const tt: *const fn (*const anyopaque) *const anyopaque = @ptrCast(self.mfarr[i]);
+                result = tt(result);
             }
             const ptr: *const B = @ptrCast(@alignCast(result));
             return ptr.*;
@@ -1290,8 +1141,11 @@ test "MyTrans" {
     const nkf2 = myTrans(i64, i32, kf2);
     const okf2 = toOpaque(i64, i32, nkf2);
 
-    var sot = [_]*const anyopaque{ okf1, okf2 };
+    var sot = [_]*const anyopaque{ okf1, okf2, okf1, okf2 };
     var mf = MF(i32, i32){ .mfarr = &sot };
+
+    // const wkf10 = mf.myTrans1(i32, i64, kf10);
+    // const rkf10 = toOpaque(i32, i64, wkf10);
 
     std.debug.print("\n{any}\n", .{mf.call(0)});
     mf.mfarr[0] = okf10;
