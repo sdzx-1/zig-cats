@@ -1234,14 +1234,17 @@ const globalAllocator = gpa.allocator();
 
 const Error1 = std.mem.Allocator.Error;
 
+var globalOutputArray: [2]u128 = undefined;
+
 pub fn myTrans(A: type, B: type, f: fn (A) B) fn (*const A) Error1!*const B {
     const Tmp = struct {
         pub fn f1(aRef: *const A) Error1!*const B {
             const a = aRef.*;
             const b = f(a);
-            std.debug.print("alloc \n", .{});
-            const ptr = try globalAllocator.create(B);
+            const ptr: *B = @ptrCast(@alignCast(&globalOutputArray));
+            std.debug.print("copy \n", .{});
             ptr.* = b;
+
             return ptr;
         }
     };
@@ -1262,7 +1265,6 @@ pub fn toOpaque(A: type, B: type, f: fn (*const A) Error1!*const B) *const fn (*
 pub fn MF(A: type, B: type) type {
     return struct {
         mfarr: []*const anyopaque,
-        memptr: [40]u8 = undefined,
 
         pub fn call(self: @This(), input: A) Error1!B {
             var result: *const anyopaque = &input;
@@ -1278,6 +1280,7 @@ pub fn MF(A: type, B: type) type {
 }
 
 test "MyTrans" {
+    // const tptr = &memptr;
     const nkf1 = myTrans(i32, i64, kf1);
     const okf1 = toOpaque(i32, i64, nkf1);
     const nkf2 = myTrans(i64, i32, kf2);
