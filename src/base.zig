@@ -229,7 +229,7 @@ const IOType = struct {
 pub fn extraIO(comptime fun: type) IOType {
     const info = @typeInfo(fun);
     switch (info) {
-        .@"fn" => |f| {
+        .Fn => |f| {
             const len = f.params.len;
             if (len != 1) {
                 @compileError("The map function must has only one parameter!");
@@ -290,7 +290,7 @@ pub fn extraStructAllTypes(comptime args: anytype) []const type {
     const ArgsType = @TypeOf(args);
     const args_type_info = @typeInfo(ArgsType);
     switch (args_type_info) {
-        .@"struct" => {
+        .Struct => {
             const fields = args_type_info.Struct.fields;
             // fields less 100!!
             var tmp: [100]type = undefined;
@@ -1116,12 +1116,21 @@ pub fn toOpaque(A: type, B: type, f: fn (*const A) *const B) *const fn (*const a
 
 pub fn MF(A: type, B: type) type {
     return struct {
-        mfarr: []*const anyopaque,
+        mfarr: ArrayList(*const anyopaque) = undefined,
+        allocator: Allocator,
+        // Input type
+        const IT = A;
+        // Output type
+        const OT = B;
+
+        pub fn dinit(self: @This()) void {
+            self.mfarr.deinit();
+        }
 
         pub fn call(self: @This(), input: A) B {
             var result: *const anyopaque = &input;
-            for (0..self.mfarr.len) |i| {
-                const tt: *const fn (*const anyopaque) *const anyopaque = @ptrCast(self.mfarr[i]);
+            for (0..self.mfarr.items.len) |i| {
+                const tt: *const fn (*const anyopaque) *const anyopaque = @ptrCast(self.mfarr.items[i]);
                 result = tt(result);
             }
             const ptr: *const B = @ptrCast(@alignCast(result));
@@ -1130,8 +1139,28 @@ pub fn MF(A: type, B: type) type {
     };
 }
 
+pub fn composeMF(mfab: anytype, mfbc: anytype) !MF(@TypeOf(mfab).IT, @TypeOf(mfbc).OT) {
+    const allocator: Allocator = mfab.allocator;
+    const mf1: ArrayList(*const anyopaque) = mfab.mfarr;
+    const mf2: ArrayList(*const anyopaque) = mfbc.mfarr;
+    var mf3 = ArrayList(*const anyopaque).init(allocator);
+    for (0..mf1.items.len) |i| {
+        try mf3.append(mf1.items[i]);
+    }
+    for (0..mf2.items.len) |i| {
+        try mf3.append(mf2.items[i]);
+    }
+
+    return .{
+        .allocator = allocator,
+        .mfarr = mf3,
+    };
+}
+
 test "MyTrans" {
     // const tptr = &memptr;
+    const allocator = testing.allocator;
+
     const nkf1 = myTrans(i32, i64, kf1);
     const okf1 = toOpaque(i32, i64, nkf1);
 
@@ -1141,15 +1170,30 @@ test "MyTrans" {
     const nkf2 = myTrans(i64, i32, kf2);
     const okf2 = toOpaque(i64, i32, nkf2);
 
-    var sot = [_]*const anyopaque{ okf1, okf2, okf1, okf2 };
-    var mf = MF(i32, i32){ .mfarr = &sot };
+    var mf = MF(i32, i32){
+        .allocator = allocator,
+        .mfarr = std.ArrayList(*const anyopaque).init(allocator),
+    };
+    defer mf.dinit();
 
-    // const wkf10 = mf.myTrans1(i32, i64, kf10);
-    // const rkf10 = toOpaque(i32, i64, wkf10);
+    try mf.mfarr.append(okf1);
+    try mf.mfarr.append(okf2);
 
     std.debug.print("\n{any}\n", .{mf.call(0)});
-    mf.mfarr[0] = okf10;
+
+    try mf.mfarr.replaceRange(0, 1, &.{okf10});
+
     std.debug.print("\n{any}\n", .{mf.call(0)});
+
+    var mf1 = try composeMF(mf, mf);
+    defer mf1.dinit();
+
+    std.debug.print("\n{any}\n", .{mf1.call(0)});
+
+    var mf2 = try composeMF(mf1, mf1);
+    defer mf2.dinit();
+
+    std.debug.print("\n{any}\n", .{mf2.call(0)});
 }
 
 pub fn kf10(i: i32) i64 {
