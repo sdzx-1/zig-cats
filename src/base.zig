@@ -1446,23 +1446,86 @@ fn add11(i: i32) i64 {
     return (i + 11);
 }
 
+test TCompose {
 
-test "cp" {
-    const f1 = WrapFun(add1);
-    const f2 = WrapFun(add2);
+    // test append function
+    const comp_fn1 = WrapFun(testu.add10);
+    // const comp_fn1 = ComposableFn(cfg, 2, add10_types).init(&testu.add10);
+    // defer comp_fn1.deinit();
+    const comp_fn2 = TCompose(comp_fn1, WrapFun(testu.add_pi_f64));
+    // const comp_fn2 = try (try comp_fn1.clone()).append(&testu.add_pi_f64);
+    // defer comp_fn2.deinit();
+    const comp_fn3 = TCompose(comp_fn2, WrapFun(div3FromF64));
+    // const comp_fn3 = try (try comp_fn2.clone()).append(&div3FromF64);
+    // defer comp_fn3.deinit();
+    const comp_fn4 = TCompose(comp_fn3, WrapFun(rainbowColorFromU32));
+    // const comp_fn4 = try (try comp_fn3.clone()).append(&rainbowColorFromU32);
+    // defer comp_fn4.deinit();
 
-    const cp1 = TCompose(f1, f2);
+    try testing.expectEqual(33, (comp_fn1{}).call(23));
+    try testing.expectEqual(36.14, (comp_fn2{}).call(23));
+    try testing.expectEqual(12, (comp_fn3{}).call(23));
+    try testing.expectEqual(.Indigo, (comp_fn4{}).call(23));
 
-    var vf = cp1{};
-    std.debug.print("\nres: {d}\n", .{vf.call(0)});
+    // test compose function
+    // const comp_fn11 = try (try comp_fn1.clone()).compose(comp_fn1);
+    const comp_fn11 = TCompose(comp_fn1, comp_fn1);
+    // defer comp_fn11.deinit();
+    // const comp_fn12 = try (try comp_fn1.clone()).compose(comp_fn2);
+    const comp_fn12 = TCompose(comp_fn1, comp_fn2);
+    // defer comp_fn12.deinit();
+    // const comp_fn13 = try (try comp_fn1.clone()).compose(comp_fn3);
+    const comp_fn13 = TCompose(comp_fn1, comp_fn3);
+    // defer comp_fn13.deinit();
+    // const comp_fn14 = try (try comp_fn1.clone()).compose(comp_fn4);
+    const comp_fn14 = TCompose(comp_fn1, comp_fn4);
+    // defer comp_fn14.deinit();
 
-    vf.funs[0] = add11;
-    std.debug.print("\nres: {d}\n", .{vf.call(0)});
+    try testing.expectEqual(43, (comp_fn11{}).call(23));
+    try testing.expectEqual(46.14, (comp_fn12{}).call(23));
+    try testing.expectEqual(15, (comp_fn13{}).call(23));
+    try testing.expectEqual(.Orange, (comp_fn14{}).call(23));
 
-    const cp2 = TCompose(cp1, cp1);
-    var vf2 = cp2{};
-    _ = &vf2;
-    std.debug.print("\nres: {d}\n", .{vf2.call(0)});
+    // const comp_two = ComposableFn(cfg, 3, [_]type{ u32, f64, u32 }).initTwo(
+    //     &testu.add_pi_f64,
+    //     &div3FromF64,
+    // );
+    const comp_two = TCompose(WrapFun(testu.add_pi_f64), WrapFun(div3FromF64));
+    // const comp_fn21 = try comp_two.compose(comp_fn1);
+    const comp_fn21 = TCompose(comp_two, comp_fn1);
+    // defer comp_fn21.deinit();
+    // const comp_fn22 = try (try comp_two.clone()).compose(comp_fn2);
+    const comp_fn22 = TCompose(comp_two, comp_fn2);
+    // defer comp_fn22.deinit();
+    // const comp_fn23 = try (try comp_two.clone()).compose(comp_fn3);
+    const comp_fn23 = TCompose(comp_two, comp_fn3);
+    // defer comp_fn23.deinit();
+    // const comp_fn24 = try (try comp_two.clone()).compose(comp_fn4);
+    const comp_fn24 = TCompose(comp_two, comp_fn4);
+    // defer comp_fn24.deinit();
+
+    try testing.expectEqual(18, (comp_fn21{}).call(23));
+    try testing.expectEqual(21.14, (comp_fn22{}).call(23));
+    try testing.expectEqual(7, (comp_fn23{}).call(23));
+    try testing.expectEqual(.Red, (comp_fn24{}).call(23));
+
+    // const comp_fn31 = try (try comp_fn3.clone()).compose(comp_fn1);
+    const comp_fn31 = TCompose(comp_fn3, comp_fn1);
+    // defer comp_fn31.deinit();
+    // const comp_fn32 = try (try comp_fn3.clone()).compose(comp_fn2);
+    const comp_fn32 = TCompose(comp_fn3, comp_fn2);
+    // defer comp_fn32.deinit();
+    // const comp_fn33 = try (try comp_fn3.clone()).compose(comp_fn3);
+    const comp_fn33 = TCompose(comp_fn3, comp_fn3);
+    // defer comp_fn33.deinit();
+    // const comp_fn34 = try (try comp_fn3.clone()).compose(comp_fn4);
+    const comp_fn34 = TCompose(comp_fn3, comp_fn4);
+    // defer comp_fn34.deinit();
+
+    try testing.expectEqual(22, (comp_fn31{}).call(23));
+    try testing.expectEqual(25.14, (comp_fn32{}).call(23));
+    try testing.expectEqual(8, (comp_fn33{}).call(23));
+    try testing.expectEqual(.Orange, (comp_fn34{}).call(23));
 }
 
 ///////////////////////////////////////
