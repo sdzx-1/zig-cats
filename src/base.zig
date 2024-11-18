@@ -1375,3 +1375,111 @@ pub fn deinitOrUnref(a: anytype) void {
         else => {},
     }
 }
+
+///////////////////////////////////////////////////////////
+pub fn WrapFun(fun: anytype) type {
+    const tif = @typeInfo(@TypeOf(fun));
+    const A = tif.Fn.params[0].type.?;
+    const B = tif.Fn.return_type.?;
+
+    return struct {
+        funs: [1]*const anyopaque = .{fun},
+        const types = [1]type{fn (A) B};
+
+        const Self = @This();
+
+        pub fn call(self: Self, a: A) B {
+            const f: *const Self.types[0] = @ptrCast(self.funs[0]);
+            return f(a);
+        }
+    };
+}
+
+pub fn TCompose(f1: type, f2: type) type {
+    const tf1 = @field(f1, "types");
+    const tf2 = @field(f2, "types");
+
+    const vf1 = @typeInfo(f1).Struct.fields[0].default_value.?;
+    const f1DP: *const [tf1.len]*const anyopaque = @alignCast(@ptrCast(vf1));
+    const v1 = f1DP.*;
+
+    const vf2 = @typeInfo(f2).Struct.fields[0].default_value.?;
+    const f2DP: *const [tf2.len]*const anyopaque = @alignCast(@ptrCast(vf2));
+    const v2 = f2DP.*;
+
+    return struct {
+        funs: [tf1.len + tf2.len]*const anyopaque = v1 ++ v2,
+        const types = tf1 ++ tf2;
+
+        const Self = @This();
+
+        const A = @typeInfo(tf1[0]).Fn.params[0].type.?;
+        const B = @typeInfo(tf2[tf2.len - 1]).Fn.return_type.?;
+
+        fn go(self: Self, comptime i: usize, a: A) @typeInfo(Self.types[i]).Fn.return_type.? {
+            if (i == 0) {
+                const v0 = self.funs[0];
+                const fun1: *const Self.types[0] = @ptrCast(v0);
+                return @call(.auto, fun1, .{a});
+            } else {
+                const vi = self.funs[i];
+                const funi: *const Self.types[i] = @ptrCast(vi);
+                return @call(.auto, funi, .{self.go(i - 1, a)});
+            }
+        }
+
+        pub fn call(self: Self, a: A) B {
+            return self.go(Self.types.len - 1, a);
+        }
+    };
+}
+
+fn add1(i: i32) i64 {
+    return (i + 1);
+}
+
+fn add2(i: i64) i32 {
+    return @intCast(i + 2);
+}
+
+fn add11(i: i32) i64 {
+    return (i + 11);
+}
+
+
+test "cp" {
+    const f1 = WrapFun(add1);
+    const f2 = WrapFun(add2);
+
+    const cp1 = TCompose(f1, f2);
+
+    var vf = cp1{};
+    std.debug.print("\nres: {d}\n", .{vf.call(0)});
+
+    vf.funs[0] = add11;
+    std.debug.print("\nres: {d}\n", .{vf.call(0)});
+
+    const cp2 = TCompose(cp1, cp1);
+    var vf2 = cp2{};
+    _ = &vf2;
+    std.debug.print("\nres: {d}\n", .{vf2.call(0)});
+}
+
+///////////////////////////////////////
+pub fn structPrint(a: type) void {
+    switch (@typeInfo(a)) {
+        .Struct => |st| {
+            const fields = st.fields;
+            inline for (fields) |f| {
+                std.debug.print("{any}\n", .{f});
+            }
+        },
+        else => unreachable,
+    }
+}
+
+pub fn typesPrint(ts: []const type) void {
+    inline for (0..ts.len) |i| {
+        std.debug.print("{any}\n", .{ts[i]});
+    }
+}
