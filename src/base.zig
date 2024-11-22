@@ -1377,6 +1377,20 @@ pub fn deinitOrUnref(a: anytype) void {
 }
 
 ///////////////////////////////////////////////////////////
+
+pub fn WrapStruct(stru: anytype) type {
+    const callFn = @field(@TypeOf(stru), "call");
+    const cinfo = @typeInfo(@TypeOf(callFn)).Fn;
+    const iType = cinfo.params[1].type.?;
+    const oType = cinfo.return_type.?;
+    const Tmp = struct {
+        pub fn tmp(a: iType) oType {
+            return stru.call(a);
+        }
+    };
+    return WrapFun(Tmp.tmp);
+}
+
 pub fn WrapFun(fun: anytype) type {
     const tif = @typeInfo(@TypeOf(fun));
     const A = tif.Fn.params[0].type.?;
@@ -1526,6 +1540,26 @@ test TCompose {
     try testing.expectEqual(25.14, (comp_fn32{}).call(23));
     try testing.expectEqual(8, (comp_fn33{}).call(23));
     try testing.expectEqual(.Orange, (comp_fn34{}).call(23));
+}
+
+test "TComposeabelLam" {
+    const add_pi_lam = WrapStruct(testu.Add_x_f64_Lam{ ._x = 3.14 });
+    const div_5_lam = WrapStruct((testu.Div_x_u32_Lam{ ._x = 5 }));
+    const add_e_f32_lam = WrapStruct((testu.Add_x_f32_Lam{ ._x = 2.72 }));
+    const point_move_lam = WrapStruct((testu.Point3_offset_u32_Lam{ ._point = .{ 46.2, 26.83, 72.56 } }));
+
+    const comp1 = add_pi_lam;
+    const comp2 = TCompose(comp1, div_5_lam);
+    try testing.expectEqual(8, (comp2{}).call(40));
+    const comp3 = TCompose(comp2, add_e_f32_lam);
+    try testing.expectEqual(10.72, (comp3{}).call(40));
+    // // _ = comp3.strongUnref();
+
+    const comp11 = add_pi_lam;
+    const comp12 = TCompose(comp11, div_5_lam);
+    const comp13 = TCompose(comp12, point_move_lam);
+    try testing.expectEqual(.{ 54.2, 34.83, 80.56 }, (comp13{}).call(40));
+    // _ = comp13.strongUnref();
 }
 
 ///////////////////////////////////////
